@@ -261,7 +261,7 @@ function shuffleAll(){
 function load(){
   var s=nowSong(); if(!s)return;
   if(curUrl)URL.revokeObjectURL(curUrl);
-  if(videoMode)stopVideo();curUrl=URL.createObjectURL(s.blob); audio.src=curUrl; updateVinyl();
+  if(videoMode)stopVideo();curUrl=s.blob?URL.createObjectURL(s.blob):s.url; audio.src=curUrl; updateVinyl();
   var p=audio.play(); if(p&&p.catch)p.catch(function(){toast('Toque ⏯ para tocar');});
   if('mediaSession' in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:s.title,artist:s.artist});}catch(e){}}
 }
@@ -424,12 +424,12 @@ function dlSearch(){
   if(!words.length)return;
   var ex=words.join(' AND '),qs='(title:('+ex+') OR creator:('+ex+')) AND mediatype:audio AND licenseurl:(*creativecommons.org*)';
   dlMsg('Buscando…');dq('.dlres').innerHTML='';
-  fetch('https://archive.org/advancedsearch.php?q='+encodeURIComponent(qs)+'&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=licenseurl&sort[]='+encodeURIComponent('downloads desc')+'&rows=20&page=1&output=json')
-  .then(function(r){return r.json();}).then(function(j){
+  getJ('https://archive.org/advancedsearch.php?q='+encodeURIComponent(qs)+'&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=licenseurl&sort[]='+encodeURIComponent('downloads desc')+'&rows=20&page=1&output=json')
+  .then(function(j){
     var docs=(j.response&&j.response.docs)||[];
     dlMsg(docs.length?'Fonte: Internet Archive. Toque em Baixar para guardar no app.':'Nada encontrado. Tente outras palavras.');
     docs.forEach(function(it){dq('.dlres').appendChild(dlCard(it));});
-  }).catch(function(){dlMsg('Não consegui acessar o Internet Archive. Este link do Claude bloqueia conexões com outros sites. Hospede o arquivo em outro lugar (por exemplo GitHub Pages ou Netlify) para usar a busca.');});
+  }).catch(function(e){dlMsg(dlErr(e));});
 }
 function dlCard(it){
   var li=document.createElement('li'),img=document.createElement('img'),d=document.createElement('div'),b=document.createElement('b'),e=document.createElement('em'),s=document.createElement('small'),row=document.createElement('div'),bt=document.createElement('button'),a=document.createElement('a');
@@ -439,7 +439,7 @@ function dlCard(it){
   a.textContent='Ver no site';a.href='https://archive.org/details/'+encodeURIComponent(it.identifier);a.target='_blank';a.rel='noopener noreferrer';
   row.className='dlrow';row.appendChild(bt);row.appendChild(a);d.appendChild(b);d.appendChild(e);d.appendChild(s);d.appendChild(row);li.appendChild(img);li.appendChild(d);return li;
 }
-function dlGet(it,bt){
+function dlGetOld(it,bt){
   bt.disabled=true;bt.textContent='Baixando…';
   var id=encodeURIComponent(it.identifier);
   fetch('https://archive.org/metadata/'+id).then(function(r){return r.json();}).then(function(m){
@@ -457,6 +457,33 @@ function dlGet(it,bt){
     });
   }).then(function(n){bt.textContent='Baixado ✓';toast(n+(n===1?' música adicionada':' músicas adicionadas'));if(stack.length){refreshTop();render();}})
   .catch(function(){bt.disabled=false;bt.textContent='Tentar de novo';dlMsg('Não foi possível baixar. Use “Ver no site” para baixar manualmente e depois importe o arquivo.');});
+}
+function jsonp(u){return new Promise(function(res,rej){
+  var n='cb'+Date.now(),s=document.createElement('script'),t=setTimeout(function(){cl();rej(new Error('tempo esgotado'));},12000);
+  function cl(){clearTimeout(t);delete window[n];if(s.parentNode)s.parentNode.removeChild(s);}
+  window[n]=function(d){cl();res(d);};
+  s.onerror=function(){cl();rej(new Error('script bloqueado'));};
+  s.src=u+(u.indexOf('?')<0?'?':'&')+'callback='+n;document.head.appendChild(s);});}
+function getJ(u){return fetch(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).catch(function(e){return jsonp(u).catch(function(){throw e;});});}
+function dlErr(e){var t=String((e&&e.message)||e);if(/fetch|network|load failed|script/i.test(t))t='sem acesso ao site (bloqueio do navegador ou da rede)';return 'Não consegui acessar o Internet Archive: '+t+'. Se estiver no link do Claude, ele bloqueia conexões com outros sites.';}
+function dlGet(it,bt){
+  bt.disabled=true;bt.textContent='Baixando…';
+  var id=encodeURIComponent(it.identifier),online=false,cov=null,n=0;
+  getJ('https://archive.org/metadata/'+id).then(function(m){
+    var seen={},fs=(m.files||[]).filter(function(f){return (f.format==='VBR MP3'||/\.mp3$/i.test(f.name||''))&&!seen[f.name]&&(seen[f.name]=1);}).slice(0,15);
+    if(!fs.length)throw new Error('item sem arquivo MP3');
+    return fetch('https://archive.org/services/img/'+id).then(function(r){return r.ok?r.blob():null;}).catch(function(){return null;}).then(function(c){
+      cov=(c&&c.type.indexOf('image')===0)?c:null;
+      return fs.reduce(function(p,f){return p.then(function(){
+        bt.textContent='Baixando '+(n+1)+'/'+fs.length+'…';
+        var url='https://archive.org/download/'+id+'/'+f.name.split('/').map(encodeURIComponent).join('/');
+        var s={title:cr(f.title)||f.name.replace(/\.[^.]+$/,''),artist:cr(f.creator)||cr(it.creator)||UNK,album:fs.length>1?cr(it.title):'',cover:cov,coverUrl:cov?'':'https://archive.org/services/img/'+id,duration:0,added:Date.now(),source:'Internet Archive',license:cr(it.licenseurl)};
+        var get=online?Promise.reject():fetch(url).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.blob();});
+        return get.then(function(bl){s.blob=new Blob([bl],{type:'audio/mpeg'});},function(){online=true;s.url=url;}).then(function(){return dbAdd(s);}).then(function(r){songs.push(r);n++;});
+      });},Promise.resolve());
+    });
+  }).then(function(){bt.textContent='Pronto ✓';toast(n+(n===1?' música adicionada':' músicas adicionadas')+(online?'. O site não permitiu baixar o arquivo, então ela toca online.':''));if(stack.length){refreshTop();render();}})
+  .catch(function(e){bt.disabled=false;bt.textContent='Tentar de novo';dlMsg(dlErr(e));});
 }
 dq('.dlx').onclick=closeDl;dq('.dlgo').onclick=dlSearch;dq('.dlq').onkeydown=function(e){if(e.key==='Enter')dlSearch();};
 var pBg=null,pBgId=null,wallKey='';
@@ -497,7 +524,7 @@ function updatePane(){
 }
 $pane.onclick=function(){if(videoMode&&vEl){var f=vEl.requestFullscreen||vEl.webkitEnterFullscreen||vEl.webkitRequestFullscreen;if(f){try{f.call(vEl);}catch(e){}}return;}showVinyl();};
 function g(i){return document.getElementById(i);}
-function coverUrl(s){if(!s||!s.cover)return '';if(!s._cu)s._cu=URL.createObjectURL(s.cover);return s._cu;}
+function coverUrl(s){if(!s)return '';if(!s.cover)return s.coverUrl||'';if(!s._cu)s._cu=URL.createObjectURL(s.cover);return s._cu;}
 function readTags(b){return new Promise(function(res){
   try{if(!window.jsmediatags)return res(null);
     var t=setTimeout(function(){res(null);},4000);
