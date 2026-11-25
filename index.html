@@ -62,7 +62,7 @@ li.dim{opacity:.6}
 .dlgo{background:linear-gradient(var(--sel1),var(--sel2))}
 .dlmsg{padding:0 .9em .5em;font-size:.85em;opacity:.8}
 .dlres{list-style:none;margin:0;padding:0 .7em 1em;overflow:auto;flex:1;-webkit-overflow-scrolling:touch}
-.dlres li{display:flex;gap:.8em;padding:.7em;margin-bottom:.6em;border-radius:.9em;background:rgba(255,255,255,.08);height:auto;font-size:1em;align-items:flex-start;justify-content:flex-start}
+.dlres li{display:flex;gap:.8em;padding:.7em;margin-bottom:.6em;border-radius:.9em;background:rgba(255,255,255,.08);height:auto!important;font-size:1em!important;align-items:flex-start!important;justify-content:flex-start!important}
 .dlres img{width:4.6em;height:4.6em;object-fit:cover;border-radius:.5em;flex:none;background:#333}
 .dlres li>div{min-width:0;flex:1}
 .dlres b,.dlres em,.dlres small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal}
@@ -419,9 +419,9 @@ function addMedia(files,kind){
     toast(ok+(ok===1?' arquivo adicionado':' arquivos adicionados'));refreshTop();render();});
 }
 var dlOpen=false,$dl=document.createElement('div');
-$dl.className='dlwin';$dl.innerHTML='<div class="dlbar"><button class="dlx" aria-label="Fechar">✕</button><input class="dlq" type="search" placeholder="Buscar músicas livres…" enterkeyhint="search"><button class="dlgo">Buscar</button></div><div class="dlmsg">Busque músicas com licença Creative Commons ou domínio público. Escolha a fonte abaixo. (app v4)</div><ul class="dlres"></ul>';
+$dl.className='dlwin';$dl.innerHTML='<div class="dlbar"><button class="dlx" aria-label="Fechar">✕</button><input class="dlq" type="search" placeholder="Buscar músicas livres…" enterkeyhint="search"><button class="dlgo">Buscar</button></div><div class="dlmsg">Busque músicas com licença Creative Commons ou domínio público. Escolha a fonte abaixo. (app v5)</div><ul class="dlres"></ul>';
 document.body.appendChild($dl);
-var sw=document.createElement('div');sw.className='dlsrc';sw.innerHTML='Fonte: <select class="dls"><option value="ia">Internet Archive</option><option value="wc">Wikimedia Commons</option></select>';
+var sw=document.createElement('div');sw.className='dlsrc';sw.innerHTML='Fonte: <select class="dls"><option value="ia">Internet Archive</option><option value="wc">Wikimedia Commons</option></select> <span style="opacity:.5;margin-left:.8em">v5</span>';
 $dl.insertBefore(sw,$dl.querySelector('.dlmsg'));
 function dq(s){return $dl.querySelector(s);}
 function dlMsg(t){dq('.dlmsg').textContent=t;}
@@ -475,7 +475,7 @@ function jsonp(u){return new Promise(function(res,rej){
   s.onerror=function(){cl();rej(new Error('script bloqueado'));};
   s.src=u+(u.indexOf('?')<0?'?':'&')+'callback='+n;document.head.appendChild(s);});}
 function getJ(u){return fetch(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).catch(function(e){return jsonp(u).catch(function(){throw e;});});}
-function dlErr(e,site){var t=String((e&&e.message)||e);if(/fetch|network|load failed|script/i.test(t))t='sem acesso ao site (bloqueio do navegador ou da rede)';return 'Não consegui acessar '+(site||'o Internet Archive')+': '+t+'. Se estiver no link do Claude, ele bloqueia conexões com outros sites. (app v4)';}
+function dlErr(e,site){var t=String((e&&e.message)||e);if(/fetch|network|load failed|script/i.test(t))t='sem acesso ao site (bloqueio do navegador ou da rede)';return 'Não consegui acessar '+(site||'o Internet Archive')+': '+t+'. Se estiver no link do Claude, ele bloqueia conexões com outros sites. (app v5)';}
 function dlGet(it,bt){
   bt.disabled=true;bt.textContent='Baixando…';
   var id=encodeURIComponent(it.identifier),online=false,cov=null,n=0;
